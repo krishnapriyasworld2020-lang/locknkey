@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AEGIS-9 // Intrusion Defense System</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #040810;
+      --panel: #0a1120;
+      --cyan: #00f0ff;
+      --red: #ff003c;
+      --green: #00ff66;
+      --amber: #ffb703;
+      --border: #1e293b;
+      --font-display: 'Orbitron', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      background-image: 
+        radial-gradient(ellipse at center, rgba(0, 240, 255, 0.05) 0%, rgba(4, 8, 16, 0.95) 80%),
+        linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 100% 100%, 30px 30px, 30px 30px;
+      color: #e2e8f0;
+      font-family: var(--font-mono);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 2rem 1rem;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* CRT Scanline Overlay */
+    body::after {
+      content: " ";
+      display: block;
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+      background-size: 100% 4px;
+      z-index: 999;
+      pointer-events: none;
+      opacity: 0.6;
+    }
+
+    .terminal-container {
+      width: 100%;
+      max-width: 480px;
+      background: var(--panel);
+      border: 1px solid rgba(0, 240, 255, 0.25);
+      border-radius: 8px;
+      box-shadow: 0 0 40px rgba(0, 240, 255, 0.1), inset 0 0 20px rgba(0, 0, 0, 0.5);
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+
+    .terminal-container.locked {
+      border-color: var(--red);
+      box-shadow: 0 0 50px rgba(255, 0, 60, 0.3), inset 0 0 20px rgba(255, 0, 60, 0.1);
+      animation: alertPulse 1.5s infinite alternate;
+    }
+
+    @keyframes alertPulse {
+      0% { box-shadow: 0 0 20px rgba(255, 0, 60, 0.2); }
+      100% { box-shadow: 0 0 50px rgba(255, 0, 60, 0.5); }
+    }
+
+    /* Terminal Header */
+    .terminal-header {
+      background: #060c18;
+      padding: 0.75rem 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sys-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: var(--font-display);
+      font-size: 0.8rem;
+      letter-spacing: 2px;
+      color: var(--cyan);
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 10px var(--cyan);
+      animation: pulse 1s infinite;
+    }
+
+    .terminal-container.locked .pulse-dot {
+      background: var(--red);
+      box-shadow: 0 0 10px var(--red);
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.3; transform: scale(0.7); }
+    }
+
+    .threat-level {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--cyan);
+      padding: 0.2rem 0.5rem;
+      border: 1px solid rgba(0, 240, 255, 0.3);
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .threat-level.elevated {
+      color: var(--amber);
+      border-color: var(--amber);
+    }
+
+    .threat-level.critical {
+      color: var(--red);
+      border-color: var(--red);
+      background: rgba(255, 0, 60, 0.1);
+    }
+
+    .terminal-body {
+      padding: 1.5rem;
+    }
+
+    /* Title & Meta */
+    .title-area {
+      text-align: center;
+      margin-bottom: 1.25rem;
+    }
+
+    .title-area h1 {
+      font-family: var(--font-display);
+      font-size: 1.4rem;
+      font-weight: 900;
+      letter-spacing: 3px;
+      color: #fff;
+      text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+    }
+
+    .title-area p {
+      font-size: 0.75rem;
+      color: #64748b;
+      margin-top: 0.25rem;
+    }
+
+    /* Security Meter / Pips */
+    .attempts-meter {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      margin-bottom: 1.25rem;
+    }
+
+    .meter-label {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .pips {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .pip {
+      width: 18px;
+      height: 6px;
+      border-radius: 2px;
+      background: #1e293b;
+      transition: background 0.3s, box-shadow 0.3s;
+    }
+
+    .pip.filled {
+      background: var(--red);
+      box-shadow: 0 0 8px var(--red);
+    }
+
+    /* Form Styles */
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.75rem;
+      color: #94a3b8;
+      margin-bottom: 0.4rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .input-wrapper {
+      position: relative;
+    }
+
+    .input-wrapper input {
+      width: 100%;
+      background: #060c18;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.75rem 1rem;
+      color: #fff;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .input-wrapper input:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+    }
+
+    input:disabled, button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .auth-btn {
+      width: 100%;
+      padding: 0.85rem;
+      font-family: var(--font-display);
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      background: var(--cyan);
+      color: #040810;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.3);
+      transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
+    }
+
+    .auth-btn:hover:not(:disabled) {
+      background: #38bdf8;
+      box-shadow: 0 0 25px rgba(0, 240, 255, 0.5);
+    }
+
+    .auth-btn:active:not(:disabled) {
+      transform: scale(0.98);
+    }
+
+    /* Live Countdown Display */
+    .countdown-banner {
+      display: none;
+      background: rgba(255, 0, 60, 0.1);
+      border: 1px solid var(--red);
+      border-radius: 6px;
+      padding: 1rem;
+      text-align: center;
+      margin-top: 1rem;
+    }
+
+    .countdown-title {
+      font-family: var(--font-display);
+      color: var(--red);
+      font-size: 0.8rem;
+      letter-spacing: 1px;
+      margin-bottom: 0.25rem;
+    }
+
+    .countdown-timer {
+      font-family: var(--font-display);
+      font-size: 1.75rem;
+      font-weight: 900;
+      color: #fff;
+      letter-spacing: 2px;
+      text-shadow: 0 0 15px var(--red);
+    }
+
+    .status-msg {
+      margin-top: 1rem;
+      padding: 0.6rem;
+      font-size: 0.8rem;
+      border-radius: 4px;
+      display: none;
+      text-align: center;
+    }
+
+    .status-msg.error {
+      display: block;
+      background: rgba(255, 0, 60, 0.15);
+      border: 1px solid var(--red);
+      color: #fca5a5;
+    }
+
+    .status-msg.success {
+      display: block;
+      background: rgba(0, 255, 102, 0.15);
+      border: 1px solid var(--green);
+      color: #86efac;
+    }
+
+    /* Activity Feed / Terminal Console */
+    .feed-container {
+      margin-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      padding-top: 1rem;
+    }
+
+    .feed-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.75rem;
+      color: #64748b;
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .feed-list {
+      list-style: none;
+      max-height: 125px;
+      overflow-y: auto;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 0.5rem;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    .feed-item {
+      font-size: 0.72rem;
+      padding: 0.25rem 0;
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
+    }
+
+    .feed-item:last-child {
+      border-bottom: none;
+    }
+
+    .feed-item.fail { color: #f87171; }
+    .feed-item.lockout { color: var(--red); font-weight: bold; }
+    .feed-item.success { color: var(--green); }
+
+    .feed-time {
+      color: #475569;
+      font-size: 0.65rem;
+      margin-left: 0.5rem;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="terminal-container" id="terminalBox">
+    <div class="terminal-header">
+      <div class="sys-badge">
+        <div class="pulse-dot"></div>
+        <span>AEGIS-9 // IDS</span>
+      </div>
+      <div class="threat-level" id="threatBadge">DEFCON 5 // NOMINAL</div>
+    </div>
+
+    <div class="terminal-body">
+      <div class="title-area">
+        <h1>GATEWAY PROTOCOL</h1>
+        <p>IDENTIFICATION REQUIRED TO ACCESS GRID</p>
+      </div>
+
+      <div class="attempts-meter">
+        <span class="meter-label">Breach Vulnerability</span>
+        <div class="pips">
+          <div class="pip" id="pip1"></div>
+          <div class="pip" id="pip2"></div>
+          <div class="pip" id="pip3"></div>
+        </div>
+      </div>
+
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="username">Operator UID (admin)</label>
+          <div class="input-wrapper">
+            <input type="text" id="username" autocomplete="off" required placeholder="ENTER UID" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="password">Passkey (password123)</label>
+          <div class="input-wrapper">
+            <input type="password" id="password" required placeholder="••••••••••••" />
+          </div>
+        </div>
+
+        <button type="submit" id="submitBtn" class="auth-btn">Authorize</button>
+      </form>
+
+      <div id="countdownBanner" class="countdown-banner">
+        <div class="countdown-title">SYSTEM LOCKDOWN ACTIVE</div>
+        <div class="countdown-timer" id="timerDisplay">00:30</div>
+      </div>
+
+      <div id="statusBox" class="status-msg"></div>
+
+      <div class="feed-container">
+        <div class="feed-header">
+          <span>Security Audit Trail</span>
+          <span id="tierLabel">PENALTY: TIER 0</span>
+        </div>
+        <ul id="feedList" class="feed-list"></ul>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const VALID_USER = "admin";
+    const VALID_PASS = "password123";
+    const PENALTY_TIERS = [30, 120];
+    const ATTEMPTS_PER_TIER = 3;
+
+    // DOM Elements
+    const terminalBox = document.getElementById("terminalBox");
+    const threatBadge = document.getElementById("threatBadge");
+    const tierLabel = document.getElementById("tierLabel");
+    const pip1 = document.getElementById("pip1");
+    const pip2 = document.getElementById("pip2");
+    const pip3 = document.getElementById("pip3");
+    const form = document.getElementById("loginForm");
+    const usernameInput = document.getElementById("username");
+    const passwordInput = document.getElementById("password");
+    const submitBtn = document.getElementById("submitBtn");
+    const countdownBanner = document.getElementById("countdownBanner");
+    const timerDisplay = document.getElementById("timerDisplay");
+    const statusBox = document.getElementById("statusBox");
+    const feedList = document.getElementById("feedList");
+
+    // Local Storage State
+    let currentTier = parseInt(localStorage.getItem("aegis_tier") || "0", 10);
+    let failedAttempts = parseInt(localStorage.getItem("aegis_attempts") || "0", 10);
+    let lockoutEndTime = parseInt(localStorage.getItem("aegis_endTime") || "0", 10);
+    let auditLog = JSON.parse(localStorage.getItem("aegis_log") || "[]");
+    let lockoutTimer = null;
+    let cachedClientLocation = null;
+
+    // Web Audio Synthesizer (Zero External Dependencies)
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playBeep(freq, type, duration) {
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch(e) {}
+    }
+
+    function soundSuccess() { 
+      playBeep(587.33, 'triangle', 0.1); 
+      setTimeout(() => playBeep(880, 'sine', 0.2), 100); 
+    }
+    
+    function soundFail() { 
+      playBeep(180, 'sawtooth', 0.25); 
+    }
+    
+    function soundLockdown() { 
+      playBeep(120, 'square', 0.4); 
+      setTimeout(() => playBeep(80, 'square', 0.5), 200); 
+    }
+
+    // IP Address & Region Fetcher
+    async function getClientIpData() {
+      if (cachedClientLocation) return cachedClientLocation;
+      try {
+        const res = await fetch("https://ipapi.co/json/");
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        cachedClientLocation = {
+          ip: data.ip || "127.0.0.1",
+          loc: `${data.region || ""}, ${data.country_code || ""}`.trim()
+        };
+      } catch (e) {
+        cachedClientLocation = { ip: "127.0.0.1", loc: "Localhost" };
+      }
+      return cachedClientLocation;
+    }
+
+    function saveState() {
+      localStorage.setItem("aegis_tier", currentTier);
+      localStorage.setItem("aegis_attempts", failedAttempts);
+      localStorage.setItem("aegis_endTime", lockoutEndTime);
+      localStorage.setItem("aegis_log", JSON.stringify(auditLog));
+    }
+
+    function addLog(msg, type) {
+      const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      auditLog.unshift({ msg, type, time });
+      if (auditLog.length > 15) auditLog.pop();
+      saveState();
+      renderLog();
+    }
+
+    function renderLog() {
+      feedList.innerHTML = "";
+      if (auditLog.length === 0) {
+        feedList.innerHTML = `<li style="color:#475569; text-align:center; padding:0.25rem;">NO AUDIT DATA</li>`;
+        return;
+      }
+      auditLog.forEach(item => {
+        const li = document.createElement("li");
+        li.className = `feed-item ${item.type}`;
+        li.innerHTML = `<span>${item.msg}</span><span class="feed-time">${item.time}</span>`;
+        feedList.appendChild(li);
+      });
+    }
+
+    function updatePipsAndThreat() {
+      pip1.className = failedAttempts >= 1 ? "pip filled" : "pip";
+      pip2.className = failedAttempts >= 2 ? "pip filled" : "pip";
+      pip3.className = failedAttempts >= 3 ? "pip filled" : "pip";
+
+      tierLabel.textContent = `PENALTY: TIER ${currentTier}`;
+
+      if (lockoutEndTime > Date.now()) {
+        threatBadge.className = "threat-level critical";
+        threatBadge.textContent = `LOCKDOWN // TIER ${currentTier}`;
+        terminalBox.classList.add("locked");
+      } else if (failedAttempts === 2) {
+        threatBadge.className = "threat-level elevated";
+        threatBadge.textContent = "DEFCON 3 // WARNING";
+        terminalBox.classList.remove("locked");
+      } else if (failedAttempts === 1) {
+        threatBadge.className = "threat-level elevated";
+        threatBadge.textContent = "DEFCON 4 // ELEVATED";
+        terminalBox.classList.remove("locked");
+      } else {
+        threatBadge.className = "threat-level";
+        threatBadge.textContent = "DEFCON 5 // NOMINAL";
+        terminalBox.classList.remove("locked");
+      }
+    }
+
+    function setFormDisabled(disabled) {
+      usernameInput.disabled = disabled;
+      passwordInput.disabled = disabled;
+      submitBtn.disabled = disabled;
+    }
+
+    function runCountdown() {
+      setFormDisabled(true);
+      countdownBanner.style.display = "block";
+      statusBox.style.display = "none";
+      updatePipsAndThreat();
+
+      function tick() {
+        const remainingMs = lockoutEndTime - Date.now();
+        const totalSeconds = Math.ceil(remainingMs / 1000);
+
+        if (totalSeconds <= 0) {
+          clearInterval(lockoutTimer);
+          lockoutTimer = null;
+          lockoutEndTime = 0;
+          failedAttempts = 0;
+          saveState();
+
+          setFormDisabled(false);
+          countdownBanner.style.display = "none";
+          updatePipsAndThreat();
+          addLog("System lockdown terminated. Security cleared.", "success");
+          return;
+        }
+
+        const mins = Math.floor(totalSeconds / 60);
+        const secs = totalSeconds % 60;
+        timerDisplay.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+      }
+
+      tick();
+      if (lockoutTimer) clearInterval(lockoutTimer);
+      lockoutTimer = setInterval(tick, 1000);
+    }
+
+    function triggerLockout() {
+      const penaltySeconds = PENALTY_TIERS[currentTier] || PENALTY_TIERS[PENALTY_TIERS.length - 1];
+      lockoutEndTime = Date.now() + penaltySeconds * 1000;
+
+      soundLockdown();
+      addLog(`🚨 CRITICAL: Cooldown initiated (${penaltySeconds}s penalty)`, "lockout");
+
+      if (currentTier < PENALTY_TIERS.length - 1) {
+        currentTier++;
+      }
+
+      saveState();
+      runCountdown();
+    }
+
+    function init() {
+      renderLog();
+      getClientIpData(); // Preload IP in background
+      const now = Date.now();
+
+      if (lockoutEndTime && lockoutEndTime > now) {
+        runCountdown();
+      } else {
+        if (lockoutEndTime && lockoutEndTime <= now) {
+          lockoutEndTime = 0;
+          failedAttempts = 0;
+          saveState();
+        }
+        updatePipsAndThreat();
+      }
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const user = usernameInput.value.trim();
+      const pass = passwordInput.value.trim();
+
+      if (user === VALID_USER && pass === VALID_PASS) {
+        soundSuccess();
+        statusBox.className = "status-msg success";
+        statusBox.textContent = "ACCESS GRANTED // AUTHORIZATION VALID";
+        addLog(`ACCESS GRANTED -> UID: ${user}`, "success");
+        
+        failedAttempts = 0;
+        currentTier = 0;
+        lockoutEndTime = 0;
+        saveState();
+        updatePipsAndThreat();
+      } else {
+        // Play failed attempt sound
+        soundFail();
+        failedAttempts++;
+
+        // Fetch and show IP address on wrong attempt
+        const ipData = await getClientIpData();
+        addLog(`AUTH FAILURE (${failedAttempts}/${ATTEMPTS_PER_TIER}) from IP: ${ipData.ip} [${ipData.loc}]`, "fail");
+        
+        saveState();
+        updatePipsAndThreat();
+
+        if (failedAttempts >= ATTEMPTS_PER_TIER) {
+          triggerLockout();
+        } else {
+          statusBox.className = "status-msg error";
+          const remaining = ATTEMPTS_PER_TIER - failedAttempts;
+          statusBox.textContent = `ACCESS DENIED // ${remaining} ATTEMPT(S) REMAINING (IP: ${ipData.ip})`;
+        }
+      }
+    });
+
+    // Reset shortcut for judges
+    window.addEventListener("keydown", (e) => {
+      if (e.shiftKey && e.key.toLowerCase() === "r") {
+        localStorage.clear();
+        location.reload();
+      }
+    });
+
+    init();
+  </script>
+</body>
+</html>
